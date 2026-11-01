@@ -1,0 +1,87 @@
+:root {
+  --bg-dark: #08090d;
+  --bg-card: #12141c;
+  --bg-card-hover: #191c28;
+  --border-color: #242938;
+  --border-glow: rgba(249, 115, 22, 0.4);
+  
+  --primary: #f97316;       /* Drummer Orange */
+  --primary-glow: #fb923c;
+  --guitar-red: #ef4444;
+  --keys-blue: #3b82f6;
+  --vocal-pink: #ec4899;
+  --producer-green: #10b981;
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  font-family: var(--font-display);
+}
+
+button {
+  font-family: var(--font-display);
+  border: none;
+  outline: none;
+  cursor: pointer;
+  background: none;
+  transition: all 0.15s ease;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+/* Animations */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(249, 115, 22, 0.4), inset 0 0 10px rgba(249, 115, 22, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(249, 115, 22, 0.8), inset 0 0 20px rgba(249, 115, 22, 0.4);
+  }
+}
+
+@keyframes beatThump {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+@keyframes comboFloat {
+  0% { transform: translateY(0px) scale(0.8); opacity: 0; }
+  50% { transform: translateY(-8px) scale(1.15); opacity: 1; }
+  100% { transform: translateY(-16px) scale(1); opacity: 0; }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
