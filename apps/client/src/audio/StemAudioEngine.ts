@@ -1,7 +1,7 @@
 /**
  * High-precision Web Audio Engine for Band League.
- * Provides sample-accurate playback for multi-track stems,
- * procedural synth backup, mute-on-miss dynamic mixing, and SFX.
+ * Supports multi-genre stem rendering, sample-accurate scheduling,
+ * dynamic stem muting on misses, producer live audio FX, and practice tempo scaling.
  */
 
 export interface StemTrack {
@@ -18,14 +18,16 @@ export class StemAudioEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
+  private producerFilter: BiquadFilterNode | null = null;
   private stems: Map<string, StemTrack> = new Map();
-  
+
   private songStartTimeCtx: number = 0;
   private pauseTimeCtx: number = 0;
   private isPlaying: boolean = false;
   private isPaused: boolean = false;
-  private calibrationOffsetMs: number = 0; // Device latency compensation
+  private calibrationOffsetMs: number = 0;
   private songDurationSeconds: number = 0;
+  private playbackRate: number = 1.0; // Practice mode tempo rate
 
   constructor() {
     const savedOffset = localStorage.getItem('band_league_latency_offset_ms');
@@ -38,13 +40,20 @@ export class StemAudioEngine {
     if (!this.ctx) {
       const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new AudioCtxClass();
-      
+
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = 0.9;
+
+      // Master Producer Filter for live DJ sweeps
+      this.producerFilter = this.ctx.createBiquadFilter();
+      this.producerFilter.type = 'lowpass';
+      this.producerFilter.frequency.value = 20000;
+
+      this.producerFilter.connect(this.masterGain);
       this.masterGain.connect(this.ctx.destination);
 
       this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.value = 0.5;
+      this.sfxGain.gain.value = 0.6;
       this.sfxGain.connect(this.masterGain);
     }
 
@@ -54,9 +63,7 @@ export class StemAudioEngine {
   }
 
   public getContext(): AudioContext {
-    if (!this.ctx) {
-      throw new Error('AudioContext not initialized. Call init() on user gesture first.');
-    }
+    if (!this.ctx) throw new Error('AudioContext not initialized.');
     return this.ctx;
   }
 
@@ -69,11 +76,23 @@ export class StemAudioEngine {
     return this.calibrationOffsetMs;
   }
 
+  public setPlaybackRate(rate: number): void {
+    this.playbackRate = Math.max(0.5, Math.min(1.5, rate));
+    this.stems.forEach((stem) => {
+      if (stem.sourceNode) {
+        stem.sourceNode.playbackRate.value = this.playbackRate;
+      }
+    });
+  }
+
+  public getPlaybackRate(): number {
+    return this.playbackRate;
+  }
+
   /**
-   * Generates or loads multi-track audio stems procedurally.
-   * Creates 4 stems: 'drums', 'bass', 'lead', and 'chords'.
+   * Generates multi-track audio stems based on song ID and genre
    */
-  public async loadProceduralSong(bpm: number = 124, totalBars: number = 24): Promise<number> {
+  public async loadProceduralSong(songId: string = 'neon-horizon', bpm: number = 124, totalBars: number = 24): Promise<number> {
     await this.init();
     const ctx = this.ctx!;
     const sampleRate = ctx.sampleRate;
@@ -82,18 +101,21 @@ export class StemAudioEngine {
     const totalDuration = totalBars * secondsPerBar;
     this.songDurationSeconds = totalDuration;
 
-    // Build stems using OfflineAudioContext for glitch-free sample-level rendering
+    // Reset previous stems
+    this.stopSong();
+    this.stems.clear();
+
     const [drumBuf, bassBuf, leadBuf, chordsBuf] = await Promise.all([
-      this.renderDrumsTrack(bpm, totalBars, sampleRate),
-      this.renderBassTrack(bpm, totalBars, sampleRate),
-      this.renderLeadTrack(bpm, totalBars, sampleRate),
-      this.renderChordsTrack(bpm, totalBars, sampleRate),
+      this.renderDrumsTrack(songId, bpm, totalBars, sampleRate),
+      this.renderBassTrack(songId, bpm, totalBars, sampleRate),
+      this.renderLeadTrack(songId, bpm, totalBars, sampleRate),
+      this.renderChordsTrack(songId, bpm, totalBars, sampleRate),
     ]);
 
-    this.registerStem('drums', drumBuf, 1.0);
+    this.registerStem('drums', drumBuf, 0.95);
     this.registerStem('bass', bassBuf, 0.85);
-    this.registerStem('lead', leadBuf, 0.8);
-    this.registerStem('chords', chordsBuf, 0.75);
+    this.registerStem('guitar', leadBuf, 0.80);
+    this.registerStem('keys', chordsBuf, 0.75);
 
     return totalDuration;
   }
@@ -105,10 +127,10 @@ export class StemAudioEngine {
 
     const filterNode = ctx.createBiquadFilter();
     filterNode.type = 'lowpass';
-    filterNode.frequency.value = 20000; // wide open initially
+    filterNode.frequency.value = 20000;
 
     filterNode.connect(gainNode);
-    gainNode.connect(this.masterGain!);
+    gainNode.connect(this.producerFilter!);
 
     this.stems.set(name, {
       name,
@@ -125,13 +147,14 @@ export class StemAudioEngine {
     this.stopSong();
 
     const now = this.ctx.currentTime;
-    this.songStartTimeCtx = now - startOffsetSec;
+    this.songStartTimeCtx = now - (startOffsetSec / this.playbackRate);
     this.isPlaying = true;
     this.isPaused = false;
 
     this.stems.forEach((stem) => {
       const source = this.ctx!.createBufferSource();
       source.buffer = stem.buffer;
+      source.playbackRate.value = this.playbackRate;
       source.connect(stem.filterNode);
       source.start(now, startOffsetSec);
       stem.sourceNode = source;
@@ -146,14 +169,14 @@ export class StemAudioEngine {
       try {
         stem.sourceNode?.stop();
       } catch {
-        // ignore if already stopped
+        // ignore
       }
     });
   }
 
   public resumeSong(): void {
     if (!this.isPaused || !this.ctx) return;
-    const elapsed = this.pauseTimeCtx - this.songStartTimeCtx;
+    const elapsed = (this.pauseTimeCtx - this.songStartTimeCtx) * this.playbackRate;
     this.startSong(elapsed);
   }
 
@@ -173,25 +196,13 @@ export class StemAudioEngine {
     });
   }
 
-  /**
-   * Returns current song playback position in milliseconds.
-   * Compensates for device audio/touch calibration offset.
-   */
   public getCurrentSongTimeMs(): number {
     if (!this.isPlaying || !this.ctx) return 0;
     if (this.isPaused) {
-      return (this.pauseTimeCtx - this.songStartTimeCtx) * 1000 - this.calibrationOffsetMs;
+      return (this.pauseTimeCtx - this.songStartTimeCtx) * 1000 * this.playbackRate - this.calibrationOffsetMs;
     }
-    const elapsedSec = this.ctx.currentTime - this.songStartTimeCtx;
+    const elapsedSec = (this.ctx.currentTime - this.songStartTimeCtx) * this.playbackRate;
     return elapsedSec * 1000 - this.calibrationOffsetMs;
-  }
-
-  public getRawSongTimeMs(): number {
-    if (!this.isPlaying || !this.ctx) return 0;
-    if (this.isPaused) {
-      return (this.pauseTimeCtx - this.songStartTimeCtx) * 1000;
-    }
-    return (this.ctx.currentTime - this.songStartTimeCtx) * 1000;
   }
 
   public getDurationSeconds(): number {
@@ -202,28 +213,57 @@ export class StemAudioEngine {
     return this.isPlaying && !this.isPaused;
   }
 
-  /**
-   * Miss penalty: low-passes or mutes the stem temporarily to simulate bad performance
-   */
   public setStemPerformanceState(stemName: string, isHealthy: boolean): void {
     const stem = this.stems.get(stemName);
     if (!stem || !this.ctx) return;
 
     const now = this.ctx.currentTime;
     if (isHealthy) {
-      // Restore crisp full spectrum
       stem.filterNode.frequency.setTargetAtTime(20000, now, 0.08);
       stem.gainNode.gain.setTargetAtTime(stem.baseVolume, now, 0.08);
     } else {
-      // Muffle stem and lower volume
-      stem.filterNode.frequency.setTargetAtTime(600, now, 0.05);
-      stem.gainNode.gain.setTargetAtTime(stem.baseVolume * 0.25, now, 0.05);
+      stem.filterNode.frequency.setTargetAtTime(500, now, 0.05);
+      stem.gainNode.gain.setTargetAtTime(stem.baseVolume * 0.2, now, 0.05);
     }
   }
 
   /**
-   * Sound effects synthesized in real time
+   * Producer live audio controls: sweeps, beat-repeater stutter, and boom drops
    */
+  public triggerProducerFx(type: 'filter_sweep' | 'stutter' | 'delay' | 'drop'): void {
+    if (!this.ctx || !this.producerFilter || !this.masterGain) return;
+    const now = this.ctx.currentTime;
+
+    if (type === 'filter_sweep') {
+      // Dynamic resonant lowpass sweep
+      this.producerFilter.frequency.setValueAtTime(20000, now);
+      this.producerFilter.frequency.exponentialRampToValueAtTime(400, now + 0.4);
+      this.producerFilter.frequency.exponentialRampToValueAtTime(20000, now + 0.9);
+      this.producerFilter.Q.setValueAtTime(6.0, now);
+      this.producerFilter.Q.linearRampToValueAtTime(1.0, now + 1.0);
+    } else if (type === 'stutter') {
+      // Rhythmic 16th-note volume gating
+      for (let i = 0; i < 6; i++) {
+        const t = now + i * 0.07;
+        this.masterGain.gain.setValueAtTime(0.05, t);
+        this.masterGain.gain.setValueAtTime(0.9, t + 0.035);
+      }
+    } else if (type === 'drop') {
+      // Massive 808 sub-bass boom
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(120, now);
+      osc.frequency.exponentialRampToValueAtTime(32, now + 0.6);
+      gain.gain.setValueAtTime(1.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 1.2);
+    }
+  }
+
   public playHitSfx(type: 'perfect' | 'great' | 'good' | 'miss' | 'unison'): void {
     if (!this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
@@ -264,7 +304,6 @@ export class StemAudioEngine {
       osc.start(now);
       osc.stop(now + 0.06);
     } else if (type === 'miss') {
-      // Low buzz / vinyl scratch
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'sawtooth';
@@ -277,7 +316,6 @@ export class StemAudioEngine {
       osc.start(now);
       osc.stop(now + 0.16);
     } else if (type === 'unison') {
-      // Big triumphant power chord
       [523.25, 659.25, 783.99, 1046.5].forEach((freq) => {
         const osc = this.ctx!.createOscillator();
         const gain = this.ctx!.createGain();
@@ -310,102 +348,115 @@ export class StemAudioEngine {
     osc.stop(now + 0.04);
   }
 
-  /* -------------------------------------------------------------
-     Procedural Stem Rendering using Web Audio OfflineAudioContext
-     ------------------------------------------------------------- */
-
-  private async renderDrumsTrack(bpm: number, bars: number, sampleRate: number): Promise<AudioBuffer> {
+  /* Multi-Genre Procedural Stems */
+  private async renderDrumsTrack(songId: string, bpm: number, bars: number, sampleRate: number): Promise<AudioBuffer> {
     const secondsPerBeat = 60 / bpm;
     const secondsPerBar = secondsPerBeat * 4;
     const totalDuration = bars * secondsPerBar;
     const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * totalDuration), sampleRate);
 
+    const isFunk = songId === 'midnight-funk';
+    const isEdm = songId === 'cyber-drop';
+    const isLofi = songId === 'sunset-lofi';
+
     for (let bar = 0; bar < bars; bar++) {
       const barTime = bar * secondsPerBar;
-      
-      // Kick on beats 1 and 3 (and syncopated hits in chorus)
-      this.synthKick(offlineCtx, barTime);
-      this.synthKick(offlineCtx, barTime + secondsPerBeat * 2);
-      if (bar % 4 === 3) {
-        this.synthKick(offlineCtx, barTime + secondsPerBeat * 2.75);
-      }
 
-      // Snare on beats 2 and 4
-      this.synthSnare(offlineCtx, barTime + secondsPerBeat);
-      this.synthSnare(offlineCtx, barTime + secondsPerBeat * 3);
-
-      // Hi-hats every eighth note
-      for (let eighth = 0; eighth < 8; eighth++) {
-        const hhTime = barTime + eighth * (secondsPerBeat / 2);
-        const isOpen = eighth === 4 || eighth === 7;
-        this.synthHiHat(offlineCtx, hhTime, isOpen);
-      }
-
-      // Drum fill on 4th bars
-      if (bar % 4 === 3) {
-        this.synthTom(offlineCtx, barTime + secondsPerBeat * 3.25, 200);
-        this.synthTom(offlineCtx, barTime + secondsPerBeat * 3.5, 150);
-        this.synthTom(offlineCtx, barTime + secondsPerBeat * 3.75, 110);
+      if (isEdm) {
+        // 4-on-the-floor kick
+        for (let b = 0; b < 4; b++) {
+          this.synthKick(offlineCtx, barTime + b * secondsPerBeat);
+        }
+        // Claps on 2 and 4
+        this.synthSnare(offlineCtx, barTime + secondsPerBeat);
+        this.synthSnare(offlineCtx, barTime + secondsPerBeat * 3);
+        // Off-beat open hats
+        for (let b = 0; b < 4; b++) {
+          this.synthHiHat(offlineCtx, barTime + b * secondsPerBeat + secondsPerBeat / 2, true);
+        }
+      } else if (isFunk) {
+        // Syncopated funky drums
+        this.synthKick(offlineCtx, barTime);
+        this.synthKick(offlineCtx, barTime + secondsPerBeat * 1.75);
+        this.synthKick(offlineCtx, barTime + secondsPerBeat * 2.5);
+        this.synthSnare(offlineCtx, barTime + secondsPerBeat);
+        this.synthSnare(offlineCtx, barTime + secondsPerBeat * 3);
+        for (let eighth = 0; eighth < 8; eighth++) {
+          this.synthHiHat(offlineCtx, barTime + eighth * (secondsPerBeat / 2), eighth % 2 === 1);
+        }
+      } else if (isLofi) {
+        // Relaxed boom-bap
+        this.synthKick(offlineCtx, barTime);
+        this.synthKick(offlineCtx, barTime + secondsPerBeat * 2.5);
+        this.synthSnare(offlineCtx, barTime + secondsPerBeat);
+        this.synthSnare(offlineCtx, barTime + secondsPerBeat * 3);
+        for (let eighth = 0; eighth < 4; eighth++) {
+          this.synthHiHat(offlineCtx, barTime + eighth * secondsPerBeat, false);
+        }
+      } else {
+        // Standard Synthwave / Arena Rock
+        this.synthKick(offlineCtx, barTime);
+        this.synthKick(offlineCtx, barTime + secondsPerBeat * 2);
+        this.synthSnare(offlineCtx, barTime + secondsPerBeat);
+        this.synthSnare(offlineCtx, barTime + secondsPerBeat * 3);
+        for (let eighth = 0; eighth < 8; eighth++) {
+          this.synthHiHat(offlineCtx, barTime + eighth * (secondsPerBeat / 2), eighth === 4 || eighth === 7);
+        }
       }
     }
 
     return await offlineCtx.startRendering();
   }
 
-  private async renderBassTrack(bpm: number, bars: number, sampleRate: number): Promise<AudioBuffer> {
+  private async renderBassTrack(songId: string, bpm: number, bars: number, sampleRate: number): Promise<AudioBuffer> {
     const secondsPerBeat = 60 / bpm;
     const secondsPerBar = secondsPerBeat * 4;
     const totalDuration = bars * secondsPerBar;
     const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * totalDuration), sampleRate);
 
-    // Synthwave / Rock Bass Progression: Am - F - C - G
-    const rootNotes = [
-      55.0,  // A1
-      43.65, // F1
-      65.41, // C2
-      49.0,  // G1
-    ];
+    const roots = songId === 'midnight-funk'
+      ? [43.65, 49.0, 55.0, 65.41] // F1, G1, A1, C2
+      : songId === 'sunset-lofi'
+      ? [55.0, 65.41, 49.0, 43.65] // Am, C, G, F
+      : [55.0, 43.65, 65.41, 49.0]; // Am, F, C, G
 
     for (let bar = 0; bar < bars; bar++) {
       const barTime = bar * secondsPerBar;
-      const root = rootNotes[bar % rootNotes.length];
+      const root = roots[bar % roots.length];
 
-      // Driving 8th note bassline
       for (let eighth = 0; eighth < 8; eighth++) {
         const noteTime = barTime + eighth * (secondsPerBeat / 2);
         const osc = offlineCtx.createOscillator();
         const gain = offlineCtx.createGain();
         const filter = offlineCtx.createBiquadFilter();
 
-        osc.type = 'sawtooth';
+        osc.type = songId === 'sunset-lofi' ? 'sine' : 'sawtooth';
         osc.frequency.setValueAtTime(root, noteTime);
 
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(450, noteTime);
-        filter.frequency.exponentialRampToValueAtTime(150, noteTime + secondsPerBeat * 0.4);
+        filter.frequency.setValueAtTime(songId === 'sunset-lofi' ? 220 : 500, noteTime);
 
-        gain.gain.setValueAtTime(0.4, noteTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, noteTime + secondsPerBeat * 0.45);
+        gain.gain.setValueAtTime(0.38, noteTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, noteTime + secondsPerBeat * 0.42);
 
         osc.connect(filter);
         filter.connect(gain);
         gain.connect(offlineCtx.destination);
 
         osc.start(noteTime);
-        osc.stop(noteTime + secondsPerBeat * 0.48);
+        osc.stop(noteTime + secondsPerBeat * 0.45);
       }
     }
 
     return await offlineCtx.startRendering();
   }
 
-  private async renderLeadTrack(bpm: number, bars: number, sampleRate: number): Promise<AudioBuffer> {
+  private async renderLeadTrack(songId: string, bpm: number, bars: number, sampleRate: number): Promise<AudioBuffer> {
     const secondsPerBeat = 60 / bpm;
     const secondsPerBar = secondsPerBeat * 4;
     const totalDuration = bars * secondsPerBar;
     const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * totalDuration), sampleRate);
 
-    // Lead guitar riff notes (frequencies in Hz)
     const riff = [
       { beat: 0.0, freq: 440.0, dur: 0.8 },  // A4
       { beat: 1.0, freq: 523.25, dur: 0.8 }, // C5
@@ -421,16 +472,15 @@ export class StemAudioEngine {
         const gain = offlineCtx.createGain();
         const filter = offlineCtx.createBiquadFilter();
 
-        osc.type = 'square';
+        osc.type = songId === 'cyber-drop' ? 'sawtooth' : 'square';
         osc.frequency.setValueAtTime(r.freq, noteTime);
 
-        // Warm lead guitar filter
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(2200, noteTime);
-        filter.Q.value = 4.0;
+        filter.frequency.setValueAtTime(2400, noteTime);
+        filter.Q.value = 3.0;
 
         const dur = r.dur * secondsPerBeat;
-        gain.gain.setValueAtTime(0.25, noteTime);
+        gain.gain.setValueAtTime(0.24, noteTime);
         gain.gain.exponentialRampToValueAtTime(0.001, noteTime + dur);
 
         osc.connect(filter);
@@ -445,13 +495,12 @@ export class StemAudioEngine {
     return await offlineCtx.startRendering();
   }
 
-  private async renderChordsTrack(bpm: number, bars: number, sampleRate: number): Promise<AudioBuffer> {
+  private async renderChordsTrack(_songId: string, bpm: number, bars: number, sampleRate: number): Promise<AudioBuffer> {
     const secondsPerBeat = 60 / bpm;
     const secondsPerBar = secondsPerBeat * 4;
     const totalDuration = bars * secondsPerBar;
     const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * totalDuration), sampleRate);
 
-    // Chords: Am, F, C, G (triads)
     const chords = [
       [220.0, 261.63, 329.63], // Am
       [174.61, 220.0, 261.63], // F
@@ -469,7 +518,6 @@ export class StemAudioEngine {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(freq, barTime);
 
-        // Long sustained chords
         gain.gain.setValueAtTime(0.001, barTime);
         gain.gain.linearRampToValueAtTime(0.12, barTime + 0.1);
         gain.gain.setValueAtTime(0.12, barTime + secondsPerBar * 0.85);
@@ -486,11 +534,10 @@ export class StemAudioEngine {
     return await offlineCtx.startRendering();
   }
 
-  /* Synthetic drum instruments */
   private synthKick(ctx: BaseAudioContext, time: number): void {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.frequency.setValueAtTime(150, time);
+    osc.frequency.setValueAtTime(160, time);
     osc.frequency.exponentialRampToValueAtTime(45, time + 0.08);
     gain.gain.setValueAtTime(1.0, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 0.28);
@@ -501,7 +548,6 @@ export class StemAudioEngine {
   }
 
   private synthSnare(ctx: BaseAudioContext, time: number): void {
-    // Tonal body
     const osc = ctx.createOscillator();
     const oscGain = ctx.createGain();
     osc.type = 'triangle';
@@ -514,13 +560,10 @@ export class StemAudioEngine {
     osc.start(time);
     osc.stop(time + 0.16);
 
-    // Noise snap
     const bufferSize = ctx.sampleRate * 0.2;
     const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
-    }
+    for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
     const noise = ctx.createBufferSource();
     noise.buffer = noiseBuffer;
     const noiseFilter = ctx.createBiquadFilter();
@@ -541,9 +584,7 @@ export class StemAudioEngine {
     const bufferSize = ctx.sampleRate * dur;
     const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
-    }
+    for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
     const noise = ctx.createBufferSource();
     noise.buffer = noiseBuffer;
     const filter = ctx.createBiquadFilter();
@@ -557,19 +598,5 @@ export class StemAudioEngine {
     gain.connect(ctx.destination);
     noise.start(time);
     noise.stop(time + dur);
-  }
-
-  private synthTom(ctx: BaseAudioContext, time: number, freq: number): void {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, time);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.6, time + 0.12);
-    gain.gain.setValueAtTime(0.5, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.16);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(time);
-    osc.stop(time + 0.18);
   }
 }

@@ -1,11 +1,13 @@
 {
   "name": "band-league-root",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Band League - Competitive web-based rhythm game for bands",
   "scripts": {
     "dev": "pnpm --filter client dev",
-    "build": "pnpm --filter @band-league/shared build && pnpm --filter client build",
+    "dev:server": "pnpm --filter @band-league/server dev",
+    "start:server": "pnpm --filter @band-league/server start",
+    "build": "pnpm --filter @band-league/shared build && pnpm --filter @band-league/server build && pnpm --filter client build",
     "test": "pnpm --filter @band-league/shared test"
   },
   "devDependencies": {

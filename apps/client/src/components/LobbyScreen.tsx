@@ -1,16 +1,37 @@
 import React from 'react';
-import { BandRole, Difficulty, ROLES } from '@band-league/shared';
-import { SAMPLE_SONG } from '../data/sampleSong';
-import { Play, Sliders, Music2, Trophy, Sparkles, Smartphone, Laptop } from 'lucide-react';
+import { BandRole, Difficulty, GameMode, ROLES, SongChart } from '@band-league/shared';
+import { ALL_SONGS } from '../data/songs';
+import {
+  Play,
+  Sliders,
+  Music2,
+  Trophy,
+  Sparkles,
+  Smartphone,
+  Laptop,
+  Swords,
+  Gauge,
+  Edit3,
+  Globe,
+  Radio,
+} from 'lucide-react';
 
 interface LobbyScreenProps {
   selectedRole: BandRole;
   onSelectRole: (role: BandRole) => void;
   selectedDifficulty: Difficulty;
   onSelectDifficulty: (diff: Difficulty) => void;
+  selectedSong: SongChart;
+  onSelectSong: (song: SongChart) => void;
+  gameMode: GameMode;
+  onSelectGameMode: (mode: GameMode) => void;
   onStartConcert: () => void;
   onOpenCalibration: () => void;
+  onOpenLeague: () => void;
+  onOpenChartEditor: () => void;
   isLoadingSong: boolean;
+  midiConnected: boolean;
+  midiDeviceName: string;
 }
 
 export const LobbyScreen: React.FC<LobbyScreenProps> = ({
@@ -18,9 +39,17 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   onSelectRole,
   selectedDifficulty,
   onSelectDifficulty,
+  selectedSong,
+  onSelectSong,
+  gameMode,
+  onSelectGameMode,
   onStartConcert,
   onOpenCalibration,
+  onOpenLeague,
+  onOpenChartEditor,
   isLoadingSong,
+  midiConnected,
+  midiDeviceName,
 }) => {
   const roleList: BandRole[] = ['drummer', 'guitarist', 'keyboardist', 'singer', 'producer'];
   const difficulties: Difficulty[] = ['easy', 'medium', 'hard'];
@@ -34,50 +63,106 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '24px 20px',
+        padding: '20px 24px',
         overflowY: 'auto',
-        background: 'radial-gradient(circle at 50% 15%, rgba(249, 115, 22, 0.12), rgba(8, 9, 13, 1) 60%)',
+        background: 'radial-gradient(circle at 50% 12%, rgba(249, 115, 22, 0.15), rgba(8, 9, 13, 1) 65%)',
       }}
     >
-      {/* Top Bar */}
+      {/* Top Navbar */}
       <div
         style={{
           width: '100%',
-          maxWidth: '960px',
+          maxWidth: '1040px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Trophy size={18} color="#f97316" />
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#f8fafc' }}>
-            Season 1: Garage League
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            onClick={onOpenLeague}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#161925',
+              border: '1px solid #282f42',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              color: '#f59e0b',
+              fontSize: '13px',
+              fontWeight: 800,
+            }}
+          >
+            <Trophy size={16} />
+            <span>Season 1 League & Venues</span>
+          </button>
+
+          <button
+            onClick={onOpenChartEditor}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#161925',
+              border: '1px solid #282f42',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              color: '#94a3b8',
+              fontSize: '13px',
+              fontWeight: 600,
+            }}
+          >
+            <Edit3 size={15} />
+            <span>Chart Studio</span>
+          </button>
         </div>
 
-        <button
-          onClick={onOpenCalibration}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            backgroundColor: '#161925',
-            border: '1px solid #282f42',
-            padding: '8px 14px',
-            borderRadius: '10px',
-            color: '#94a3b8',
-            fontSize: '13px',
-            fontWeight: 600,
-          }}
-        >
-          <Sliders size={16} />
-          <span>Calibrate Timing</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {midiConnected && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                border: '1px solid rgba(34, 197, 94, 0.3)',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                color: '#22c55e',
+                fontWeight: 700,
+              }}
+            >
+              <Radio size={14} /> MIDI: {midiDeviceName}
+            </div>
+          )}
+
+          <button
+            onClick={onOpenCalibration}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#161925',
+              border: '1px solid #282f42',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              color: '#94a3b8',
+              fontSize: '13px',
+              fontWeight: 600,
+            }}
+          >
+            <Sliders size={16} />
+            <span>Calibrate</span>
+          </button>
+        </div>
       </div>
 
-      {/* Hero Title */}
-      <div style={{ textAlign: 'center', margin: '20px 0 16px' }}>
+      {/* Hero Header */}
+      <div style={{ textAlign: 'center', margin: '14px 0 10px' }}>
         <div
           style={{
             display: 'inline-flex',
@@ -87,19 +172,19 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             border: '1px solid rgba(249, 115, 22, 0.3)',
             borderRadius: '20px',
             padding: '4px 14px',
-            fontSize: '12px',
+            fontSize: '11px',
             fontWeight: 800,
             color: '#f97316',
             letterSpacing: '1px',
             textTransform: 'uppercase',
-            marginBottom: '8px',
+            marginBottom: '6px',
           }}
         >
-          <Sparkles size={14} /> Competitive Band Rhythm Battles
+          <Sparkles size={14} /> All 5 Band Roles Ready
         </div>
         <h1
           style={{
-            fontSize: 'clamp(36px, 6vw, 64px)',
+            fontSize: 'clamp(32px, 5.5vw, 56px)',
             fontWeight: 900,
             color: '#f8fafc',
             letterSpacing: '-1px',
@@ -108,93 +193,107 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         >
           BAND <span style={{ color: '#f97316' }}>LEAGUE</span>
         </h1>
-        <p style={{ fontSize: '15px', color: '#94a3b8', maxWidth: '520px', margin: '8px auto 0' }}>
-          Form bands, sync in virtual concerts, and climb the seasonal leaderboards together.
+        <p style={{ fontSize: '14px', color: '#94a3b8', maxWidth: '520px', margin: '6px auto 0' }}>
+          Form bands, sync on multi-track stems, and compete in virtual concerts and arena battles.
         </p>
+      </div>
+
+      {/* Mode Selector */}
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '1040px',
+          display: 'flex',
+          gap: '8px',
+          overflowX: 'auto',
+          paddingBottom: '4px',
+        }}
+      >
+        {[
+          { id: 'quickplay', name: 'Quick Concert', icon: <Play size={14} /> },
+          { id: 'battle', name: 'Battle of the Bands', icon: <Swords size={14} /> },
+          { id: 'online_coop', name: 'Online Room Co-Op', icon: <Globe size={14} /> },
+          { id: 'practice', name: 'Practice Rehearsal', icon: <Gauge size={14} /> },
+        ].map((m) => {
+          const isSel = gameMode === m.id;
+          return (
+            <button
+              key={m.id}
+              onClick={() => onSelectGameMode(m.id as GameMode)}
+              style={{
+                flex: 1,
+                minWidth: '150px',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                backgroundColor: isSel ? '#f97316' : '#141724',
+                color: isSel ? '#08090d' : '#94a3b8',
+                fontWeight: 800,
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                border: isSel ? 'none' : '1px solid #23293a',
+              }}
+            >
+              {m.icon}
+              <span>{m.name}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Main Selection Area */}
       <div
         style={{
           width: '100%',
-          maxWidth: '960px',
+          maxWidth: '1040px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '20px',
+          gap: '16px',
+          marginTop: '12px',
         }}
       >
         {/* Role Selector */}
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 800, color: '#64748b', letterSpacing: '0.5px' }}>
-              CHOOSE YOUR BAND ROLE
-            </span>
-            <span style={{ fontSize: '12px', color: '#f97316', fontWeight: 600 }}>
-              Phase 0: Drummer Fully Playable
-            </span>
+          <div style={{ fontSize: '12px', fontWeight: 800, color: '#64748b', marginBottom: '8px' }}>
+            SELECT YOUR ROLE (ALL 5 PLAYABLE)
           </div>
-
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: '12px',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '10px',
             }}
           >
             {roleList.map((rId) => {
               const r = ROLES[rId];
               const isSelected = selectedRole === rId;
-              const isDrummer = rId === 'drummer';
 
               return (
                 <div
                   key={rId}
-                  onClick={() => {
-                    if (isDrummer) onSelectRole(rId);
-                  }}
+                  onClick={() => onSelectRole(rId)}
                   style={{
                     backgroundColor: isSelected ? '#191c28' : '#10121a',
                     border: isSelected ? `2px solid ${r.color}` : '1px solid #1f2433',
                     boxShadow: isSelected ? `0 0 20px ${r.color}55` : 'none',
                     borderRadius: '14px',
-                    padding: '14px',
-                    cursor: isDrummer ? 'pointer' : 'default',
-                    opacity: isDrummer ? 1 : 0.65,
+                    padding: '12px',
+                    cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     textAlign: 'center',
-                    position: 'relative',
                     transition: 'all 0.15s ease',
                   }}
                 >
-                  {!isDrummer && (
-                    <span
-                      style={{
-                        position: 'absolute',
-                        top: '8px',
-                        right: '8px',
-                        fontSize: '9px',
-                        fontWeight: 800,
-                        backgroundColor: '#282f42',
-                        color: '#94a3b8',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                      }}
-                    >
-                      PHASE 1
-                    </span>
-                  )}
-                  <span style={{ fontSize: '32px' }}>{r.icon}</span>
-                  <span
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: 800,
-                      color: isSelected ? '#ffffff' : '#f8fafc',
-                      marginTop: '6px',
-                    }}
-                  >
+                  <span style={{ fontSize: '28px' }}>{r.icon}</span>
+                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#f8fafc', marginTop: '4px' }}>
                     {r.name}
+                  </span>
+                  <span style={{ fontSize: '11px', color: r.color, fontWeight: 700, marginTop: '2px' }}>
+                    ⚡ {r.specialAbilityName}
                   </span>
                   <span
                     style={{
@@ -216,69 +315,68 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </div>
         </div>
 
-        {/* Song & Difficulty Panel */}
+        {/* Song and Difficulty Selection */}
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '16px',
+            gap: '14px',
           }}
         >
-          {/* Song Card */}
+          {/* Song Selector */}
           <div
             style={{
               backgroundColor: '#12141c',
               border: '1px solid #242938',
               borderRadius: '16px',
-              padding: '18px',
+              padding: '16px',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
+              gap: '10px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f97316', marginBottom: '8px' }}>
-              <Music2 size={16} />
-              <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.5px' }}>
-                FEATURED CONCERT TRACK
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f97316', fontSize: '11px', fontWeight: 800 }}>
+              <Music2 size={15} /> SELECT CONCERT TRACK
             </div>
 
-            <div>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: '#f8fafc' }}>
-                {SAMPLE_SONG.title}
-              </div>
-              <div style={{ fontSize: '14px', color: '#94a3b8' }}>{SAMPLE_SONG.artist}</div>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                gap: '12px',
-                marginTop: '14px',
-                fontSize: '12px',
-                color: '#64748b',
-                fontFamily: 'JetBrains Mono, monospace',
-              }}
-            >
-              <span>{SAMPLE_SONG.bpm} BPM</span>
-              <span>•</span>
-              <span>{SAMPLE_SONG.genre}</span>
-              <span>•</span>
-              <span>4 Stems</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {ALL_SONGS.map((song) => {
+                const isSel = selectedSong.id === song.id;
+                return (
+                  <div
+                    key={song.id}
+                    onClick={() => onSelectSong(song)}
+                    style={{
+                      padding: '10px',
+                      borderRadius: '10px',
+                      backgroundColor: isSel ? 'rgba(249, 115, 22, 0.15)' : '#161925',
+                      border: isSel ? '1px solid #f97316' : '1px solid #242938',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: isSel ? '#f97316' : '#f8fafc' }}>
+                      {song.title}
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>
+                      {song.bpm} BPM • {song.genre}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Difficulty Selection & Controls Guide */}
+          {/* Difficulty & Quick Controls */}
           <div
             style={{
               backgroundColor: '#12141c',
               border: '1px solid #242938',
               borderRadius: '16px',
-              padding: '18px',
+              padding: '16px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              gap: '14px',
+              gap: '12px',
             }}
           >
             <div>
@@ -311,7 +409,6 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               </div>
             </div>
 
-            {/* Quick Controls Reminder */}
             <div
               style={{
                 backgroundColor: '#0a0b10',
@@ -319,17 +416,17 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 padding: '10px 14px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '12px',
-                fontSize: '12px',
+                gap: '10px',
+                fontSize: '11px',
                 color: '#94a3b8',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f8fafc' }}>
-                <Laptop size={14} /> <span>F, G, H, J + Space</span>
+                <Laptop size={14} /> <span>{ROLES[selectedRole].controlsHint.laptop}</span>
               </div>
               <span>|</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f8fafc' }}>
-                <Smartphone size={14} /> <span>4 Touch Pads</span>
+                <Smartphone size={14} /> <span>{ROLES[selectedRole].controlsHint.mobile}</span>
               </div>
             </div>
           </div>
@@ -354,18 +451,25 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             justifyContent: 'center',
             gap: '10px',
             boxShadow: '0 0 30px rgba(249, 115, 22, 0.4)',
-            marginTop: '8px',
+            marginTop: '4px',
             opacity: isLoadingSong ? 0.7 : 1,
           }}
         >
           <Play size={22} fill="#08090d" />
-          <span>{isLoadingSong ? 'Synthesizing Concert Stems...' : 'ENTER STAGE & PERFORM'}</span>
+          <span>
+            {isLoadingSong
+              ? 'Rendering Stems & Tuning Audio...'
+              : gameMode === 'battle'
+              ? 'ENTER ARENA & BATTLE'
+              : gameMode === 'practice'
+              ? 'START REHEARSAL'
+              : 'ENTER STAGE & PERFORM'}
+          </span>
         </button>
       </div>
 
-      {/* Footer Info */}
-      <div style={{ fontSize: '12px', color: '#475569', textAlign: 'center', marginTop: '16px' }}>
-        Band League v0.1 Prototype • Web Audio Multi-Track Stems • Playable on Mobile & Laptop
+      <div style={{ fontSize: '11px', color: '#475569', textAlign: 'center', marginTop: '14px' }}>
+        Band League v1.0 • Web Audio Procedural Stems • Real-Time Colyseus Engine • Web MIDI & Pitch Analysis
       </div>
     </div>
   );

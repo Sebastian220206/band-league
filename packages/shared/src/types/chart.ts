@@ -3,11 +3,11 @@ import { BandRole, Difficulty } from './game.js';
 export interface ChartNote {
   id: string | number;
   beat: number;
-  lane: number; // 0-based lane index
-  holdBeats?: number;
-  pitch?: number; // for singer (MIDI note number or semitones)
+  lane: number; // 0-based lane index (0..4 guitar, 0..6 keys, 0..3 drums, 0..3 producer faders)
+  holdBeats?: number; // for sustain notes (guitar/keys/singer)
+  pitch?: number; // for singer: MIDI semitone (e.g. 60 = C4, 62 = D4, 64 = E4)
   accent?: boolean; // unison / heavy accent note
-  type?: 'tap' | 'hold' | 'roll' | 'unison' | 'drop';
+  type?: 'tap' | 'hold' | 'roll' | 'unison' | 'drop' | 'vocal_run' | 'fader_cue';
 }
 
 export interface RoleChart {
@@ -32,7 +32,7 @@ export interface SongChart {
   artist: string;
   genre: string;
   bpm: number;
-  offsetMs: number; // audio lead-in / calibration offset
+  offsetMs: number;
   durationSeconds: number;
   sections: SongSection[];
   stems: {

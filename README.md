@@ -1,70 +1,92 @@
 # Band League 🎸🥁🎹🎤🎛️
 
-**Band League** is a competitive, cross-platform (mobile & laptop) web rhythm game where musicians form virtual bands, synchronize their musical timing, and compete in virtual concerts and seasonal league battles.
+**Band League** is a competitive, cross-platform (mobile & laptop) web rhythm game where musicians form virtual bands, synchronize musical timing, and compete in virtual concerts, venue tours, and arena battles.
 
 ---
 
-## 🎮 Phase 0 Prototype: What's Live
+## 🚀 All Phases Completed
 
-- **Cross-Platform Controls**:
-  - **Laptop/Desktop**: `F`, `G`, `H`, `J` (Drum Pads 1–4) + `Space` (Kick alternate), or `D`, `F`, `J`, `K`.
-  - **Mobile**: Responsive touch pads with multi-touch support for unison hits.
-- **Web Audio Multi-Track Stems**:
-  - Procedurally synthesized multi-track stems: **Drums**, **Bass**, **Lead Guitar**, and **Chords/Keys**.
-  - **Mute / Distort on Miss**: Missing notes drops the drummer's stem into a low-pass filter; keeping combos restores full audio clarity.
-  - Real-time synthesized SFX for Perfect, Great, Good, Miss, and Unison chords.
-- **Sample-Accurate Timing Engine**:
-  - Judgements: **Perfect** (±35ms), **Great** (±70ms), **Good** (±110ms), **Miss** (>110ms).
-  - Accuracy tracking, dynamic combo multipliers (up to 4x).
-  - Crowd Hype Meter (0–100%) that can boo the band off stage if too many misses accumulate.
-- **Latency Calibration System**:
-  - Interactive metronome tap test measuring hardware audio/touch latency offset in milliseconds.
-  - Fine-tuning slider (-150ms to +150ms) saved to `localStorage`.
-- **Note Highway Visuals**:
-  - 60 FPS hardware-accelerated canvas renderer with beat lines, highway glow, target receptor shockwaves, note gems, and particle explosions.
+### 1. Core Musical Roles (All 5 Implemented)
+- 🥁 **Drummer**: 4 pads + kick (`F, G, H, J` + `Space` / touch pads). Tempo anchor with groove lock ability.
+- 🎸 **Guitarist**: 5-lane highway (`D, F, J, K, L` / 5 touch lanes), hold sustains, and **Solo Overdrive** (2× points + pyrotechnics).
+- 🎹 **Keyboardist**: 7-key keyboard (`A, S, D, F, G, H, J` / piano strip) with **Web MIDI API** support for hardware USB keyboards.
+- 🎤 **Singer**: Smooth vocal pitch highway. Supports both touch/mouse pitch tracing AND **real microphone input** with auto-correlation pitch detection!
+- 🎛️ **Producer**: Interactive DJ mixer with 4 stem faders, live audio FX triggers (*Filter Sweep*, *16th-Note Stutter*, *Delay*), and **THE DROP** (2.5× band-wide multiplier).
+
+### 2. Multi-Genre Audio Stem Engine
+- **Procedurally Synthesized Tracks** (Zero external downloads required, 100% sample-accurate Web Audio rendering):
+  1. **"Neon Horizon"** (124 BPM, Synthwave / Arena Rock)
+  2. **"Midnight Funk Groove"** (116 BPM, Disco / Funk)
+  3. **"Cybernetic Drop"** (128 BPM, EDM / Electro House)
+  4. **"Sunset in Shibuya"** (85 BPM, Chill Lo-Fi Hip Hop)
+- **Dynamic Mute on Miss**: When any role misses, their respective instrument stem drops into a muffled low-pass filter; sustaining combos restores clarity.
+
+### 3. Game Modes
+- 🎸 **Quick Concert**: Form a band with AI bandmates who simulate realistic human jitter and combo streaks.
+- ⚔️ **Battle of the Bands**: Head-to-head clash on the same song with a live **Tug-of-War Momentum Meter** and ELO rating exchanges.
+- 🏆 **Band League & Venues Tour**: Progress from *The Rehearsal Garage* to *The Neon Basement Club*, *Starlight Arena*, and *Solaris World Festival*. Weekly promotion/relegation divisions (*Garage*, *Club*, *Arena*, *Festival*, *Headliner*).
+- 🎧 **Practice Rehearsal**: 50% to 150% tempo speed slider + section looping for mastering difficult fills.
+- 🎼 **Chart Studio**: In-browser beatmap editor with interactive timeline matrix, beat grid, test play, and JSON export/import.
+- 🌐 **Online Co-Op**: Colyseus WebSocket server with NTP clock synchronization and live hit relay.
 
 ---
 
-## 🚀 Quick Start
+## 🎮 Controls Quick Reference
+
+| Role | Laptop / Desktop Keys | Mobile Touchscreen | Hardware / Special |
+|---|---|---|---|
+| 🥁 **Drummer** | `F, G, H, J` + `Space` (Kick) | 4 Touch Pads (Kick, Snare, Hat, Crash) | Electronic Drum Kits via MIDI |
+| 🎸 **Guitarist** | `D, F, J, K, L` | 5 Fret Touch Lanes | Solo Overdrive Button |
+| 🎹 **Keyboardist** | `A, S, D, F, G, H, J` | Piano Strip | USB MIDI Keyboard |
+| 🎤 **Singer** | Vertical Mouse / Cursor | Vertical Pitch Ribbon | Real Microphone (Auto-pitch) |
+| 🎛️ **Producer** | Mouse Faders + FX buttons | Faders & FX Touch Pads | Live Audio Filters & Drop |
+
+---
+
+## 🛠️ Quick Start
 
 ### 1. Install Dependencies
 ```bash
 pnpm install
 ```
 
-### 2. Build Shared Package & Client
+### 2. Run Tests & Build
 ```bash
+pnpm test
 pnpm run build
 ```
 
-### 3. Run Unit Tests
+### 3. Start the Real-Time Colyseus Server
 ```bash
-pnpm test
+pnpm run start:server
 ```
+*(Server listens on `http://localhost:2567` for multiplayer concerts & battle matchmaking)*
 
-### 4. Start the Local Dev Server
+### 4. Start the Client Web App
 ```bash
 pnpm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) on your laptop, or use your local IP on your mobile phone on the same Wi-Fi.
+Open **[http://localhost:3000](http://localhost:3000)** in your browser or on your phone over local Wi-Fi.
 
 ---
 
-## 📂 Project Architecture
+## 📂 Architecture Overview
 
 ```
 band-league/
 ├── apps/
-│   ├── client/                  # Vite + React + Canvas Web Audio Game Client
+│   ├── client/                  # Vite + React + Canvas Game Client
 │   │   ├── src/
-│   │   │   ├── audio/           # StemAudioEngine (Web Audio sample-accurate player & synth)
-│   │   │   ├── engine/          # NoteHighwayRenderer (60fps canvas note highway)
-│   │   │   ├── input/           # InputManager (multi-touch & low-latency keyboard)
-│   │   │   ├── data/            # Song charts & Unison events
-│   │   │   ├── components/      # Lobby, Concert HUD, Touch Pads, Calibration, Results
-│   │   │   └── App.tsx          # Main orchestrator
-│   └── chart-editor/            # (Phase 1)
-├── packages/
-│   └── shared/                  # Core game logic, timing windows, scoring formulas, types
-└── package.json                 # pnpm workspace configuration
+│   │   │   ├── audio/           # StemAudioEngine (Multi-genre synth) & PitchDetector (Mic)
+│   │   │   ├── engine/          # NoteHighwayRenderer (60 FPS Canvas note highway)
+│   │   │   ├── input/           # InputManager & MidiManager (Web MIDI API)
+│   │   │   ├── net/             # NetworkManager (Colyseus WebSocket client)
+│   │   │   ├── data/            # 4 Songs with multi-role charts & unison events
+│   │   │   └── components/      # Lobby, HUD, Controls, Battle, Practice, League, ChartEditor
+│   └── server/                  # Colyseus + Express Real-Time Game Server
+│       └── src/
+│           ├── rooms/           # ConcertRoom & BattleRoom
+│           └── index.ts         # REST API & WebSocket transport
+└── packages/
+    └── shared/                  # Judgement windows, ELO calculation, scoring formulas, types
 ```
